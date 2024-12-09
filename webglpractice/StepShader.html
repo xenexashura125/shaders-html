@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/gsap.min.js" integrity="sha512-VEBjfxWUOyzl0bAwh4gdLEaQyDYPvLrZql3pw1ifgb6fhEvZl9iDDehwHZ+dsMzA0Jfww8Xt7COSZuJ/slxc4Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollTrigger.min.js" integrity="sha512-v8B8T8l8JiiJRGomPd2k+bPS98RWBLGChFMJbK1hmHiDHYq0EjdQl20LyWeIs+MGRLTWBycJGEGAjKkEtd7w5Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollToPlugin.min.js" integrity="sha512-lZACdYsy0W98dOcn+QRNHDxFuhm62lfs8qK5+wPp7X358CN3f+ml49HpnwzTiXFzETs4++fADePDI+L2zwlm7Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <title>Document</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        #container { 
+            width: 600px;
+            height: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.150.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.150.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script id="vertexShader" type="x-shader/x-vertex">
+        void main() {
+            gl_Position = vec4( position, 1.0 );
+        }
+    </script>
+
+    <!-- Note that number should always be float in shaders -->
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        uniform vec2 u_resolution;
+        uniform float u_time;
+
+        uniform sampler2D u_tex0;
+        uniform float u_animate;
+
+        mat2 rotate(float angle) {
+            return mat2(cos(angle) * 4.0, -sin(angle), sin(angle),cos(angle) * 4.0);
+        }
+        
+        mat2 scale(vec2 scale) {
+            return mat2(scale.x,scale.x / scale.y,scale.y / scale.x,scale.y);
+        }
+        vec2 tile(vec2 _st, float _zoom){
+            _st *= _zoom;
+            return fract(_st);
+        }
+
+        float rectshape(vec2 position, vec2 scale) {
+            scale = vec2(0.5) - scale * 0.5;
+            vec2 shaper = vec2(step(scale.x,position.x), step(scale.y,position.y));
+            shaper *= vec2(step(scale.x,1.0 - position.x),step(scale.y, 1.0 - position.y));
+            return shaper.x * shaper.y;
+        }
+
+        void main(){
+            vec2 st = gl_FragCoord.xy/u_resolution.xy;
+            vec3 color = vec3(0.0);
+            
+            st = tile(st,5.0);
+            
+            // Short Version 
+            // bottom-left
+            // vec2 bl = step(vec2(0.1),st);
+
+            // top-right
+            // vec2 tr = step(vec2(0.1),1.0-st);
+
+            // The multiplication of left*bottom will be similar to the logical AND.
+            // color = vec3(bl.x * bl.y * tr.x * tr.y);
+        
+
+            // Long Version
+            // Each result will return 1.0 (white) or 0.0 (black).
+             float left = step(0.2,st.x);   // Similar to ( X greater than 0.2 )
+             float bottom = step(0.2,st.y); // Similar to ( Y greater than 0.2 )
+            
+             float right = step(0.2,1.0 - st.x);   // Similar to ( X greater than 0.2 )
+             float top = step(0.2,1.0 - st.y); // Similar to ( Y greater than 0.1 )
+
+            // color = vec3( left * bottom * right * top);
+
+
+            // float rectangle = rectshape(st,vec2(0.3,0.3));
+
+            color = vec3( left * bottom * right * top );
+
+            gl_FragColor = vec4(color,1.0);
+        }
+    </script>
+
+
+    <script type="module">
+
+        import * as THREE from 'three';
+
+        var container;
+        var camera, scene, renderer, clock;
+        var uniforms;
+
+        init();
+        animate();
+
+        function init() {
+            container = document.getElementById( 'container' );
+
+            camera = new THREE.Camera();
+            camera.position.z = 1;
+
+            scene = new THREE.Scene();
+            clock = new THREE.Clock();
+
+            var geometry = new THREE.PlaneBufferGeometry( 2, 2 );
+            var textureLoader = new THREE.TextureLoader();
+            var texture = textureLoader.load( './img/gundam.jpg' );
+
+            uniforms = {
+                u_time: { type: "f", value: 1.0 },
+                u_animate: { type: "f", value: 1.0 },
+                u_resolution: { type: "v2", value: new THREE.Vector2() },
+                u_mouse: { type: "v2", value: new THREE.Vector2() },
+                u_tex0: { type: "t", value: texture }
+            };
+
+            var material = new THREE.ShaderMaterial( {
+                uniforms: uniforms,
+                vertexShader: document.getElementById( 'vertexShader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+            } );
+
+
+            var mesh = new THREE.Mesh( geometry, material );
+            scene.add( mesh );
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+
+            container.appendChild( renderer.domElement );
+
+            onWindowResize();
+            window.addEventListener( 'resize', onWindowResize, false );
+
+            document.onmousemove = function(e){
+              uniforms.u_mouse.value.x = e.pageX
+              uniforms.u_mouse.value.y = e.pageY
+            }
+        }
+
+        function onWindowResize( event ) {
+            renderer.setSize( container.clientWidth, container.clientHeight );
+            uniforms.u_resolution.value.x = renderer.domElement.width;
+            uniforms.u_resolution.value.y = renderer.domElement.height;
+        }
+
+        function animate() {
+            requestAnimationFrame( animate );
+            render();
+        }
+
+        function render() {
+            
+            if (uniforms.u_time.value >= 2.5) {
+                uniforms.u_time.value = uniforms.u_time.value
+            } else {
+                uniforms.u_time.value += clock.getDelta();
+            }
+
+            renderer.render( scene, camera );
+        }
+    </script>
+
+</body>
+</html>

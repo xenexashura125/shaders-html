@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: black;
+        }
+        canvas {
+            position: absolute;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const fontSize = 200;
+        const rhombusSize = 400;
+        let angle = 0;
+        let xPos = -rhombusSize;
+        let text = 'L O A D I N G';
+        let counter = 0;
+
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = 'white';
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+            ctx.restore();
+
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.translate(xPos, canvas.height / 2);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(0, -rhombusSize / 2);
+            ctx.lineTo(rhombusSize / 2, 0);
+            ctx.lineTo(0, rhombusSize / 2);
+            ctx.lineTo(-rhombusSize / 2, 0);
+            ctx.closePath();
+
+            const gradient = ctx.createLinearGradient(-rhombusSize / 2, 0, rhombusSize / 2, 0);
+            gradient.addColorStop(0, 'rgba(31, 27, 27, 0)');
+            gradient.addColorStop(0.5, 'rgba(18, 16, 16, 0.5)');
+            gradient.addColorStop(1, 'rgba(29, 26, 26, 1)');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            ctx.restore();
+
+            angle += 0.05;
+            xPos += 5;
+            if (xPos > canvas.width + rhombusSize) {
+                xPos = -rhombusSize;
+                counter++;
+
+                if (counter === 1) {
+                    text = 'K A Z E';
+                } else if (counter > 1) {
+                    return; // Stop the animation after both texts have been displayed
+                }
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>

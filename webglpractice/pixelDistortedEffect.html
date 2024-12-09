@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/gsap.min.js" integrity="sha512-VEBjfxWUOyzl0bAwh4gdLEaQyDYPvLrZql3pw1ifgb6fhEvZl9iDDehwHZ+dsMzA0Jfww8Xt7COSZuJ/slxc4Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollTrigger.min.js" integrity="sha512-v8B8T8l8JiiJRGomPd2k+bPS98RWBLGChFMJbK1hmHiDHYq0EjdQl20LyWeIs+MGRLTWBycJGEGAjKkEtd7w5Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollToPlugin.min.js" integrity="sha512-lZACdYsy0W98dOcn+QRNHDxFuhm62lfs8qK5+wPp7X358CN3f+ml49HpnwzTiXFzETs4++fADePDI+L2zwlm7Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <title>Document</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        .contaner { 
+            width: 600px;
+            height: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.150.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.150.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script id="vertexShader" type="x-shader/x-vertex">
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = vec4( position, 1.0 );
+        }
+        
+    </script>
+
+    <!-- Note that number should always be float in shaders -->
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        uniform sampler2D u_tex0; 
+        uniform float u_animate; 
+        uniform vec2 u_resolution; 
+        uniform float u_time; 
+        #define PI 3.14159265358979323846 
+
+        float pixelPattern(float x, float frequency, float speed, float time) { 
+            return sin((x * frequency - time * speed) * 2.0 * PI); 
+        } 
+
+        void main() { 
+
+            vec2 st = gl_FragCoord.xy / u_resolution.xy; 
+            vec4 original_img = texture2D(u_tex0, st); 
+            float grayscale_value = dot(original_img.rgb, vec3(0.299, 0.587, 0.114)); 
+            vec4 grayscale_img = vec4(vec3(grayscale_value), 1.0); 
+            float transitionSpeed = 1.0; 
+            float transition = st.x * 6.0 - u_time * transitionSpeed; 
+            float pixelSize = 0.005; 
+            vec2 pixelUV = vec2(floor(st.x  / pixelSize) * pixelSize, floor(st.y + st.x  / pixelSize * 2.0) * pixelSize); 
+            float pixelDistortion = pixelPattern(pixelUV.y / pixelUV.x, 1.0, 0.001, u_time); 
+            vec2 distortedUV = vec2(st.x, st.y + pixelDistortion * smoothstep(0.0, 1.0, transition)); 
+            vec4 distortedImg = texture2D(u_tex0, distortedUV); 
+            vec3 final_color = mix(distortedImg.rgb, grayscale_img.rgb, smoothstep(0.0, 1.0, transition)); 
+            gl_FragColor = vec4(final_color, 1.0); 
+
+        }
+    </script>
+    
+
+    <script type="module">
+
+        import * as THREE from 'three';
+
+        var container;
+        var camera, scene, renderer, clock;
+        var uniforms;
+
+        init();
+        animate();
+
+        function init() {
+            container = document.getElementById( 'container' );
+
+            camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 1, 10000 );
+            camera.position.z = 10;
+
+            scene = new THREE.Scene();
+            clock = new THREE.Clock();
+
+            var geometry = new THREE.PlaneGeometry( 1, 1 );
+            var textureLoader = new THREE.TextureLoader();
+            var texture = textureLoader.load( './img/gundam.jpg' );
+
+            uniforms = {
+                u_time: { type: "f", value: 1.0 },
+                u_animate: { type: "f", value: 1.0 },
+                u_resolution: { type: "v2", value: new THREE.Vector2() },
+                u_mouse: { type: "v2", value: new THREE.Vector2() },
+                u_tex0: { type: "t", value: texture }
+            };
+
+            var material = new THREE.ShaderMaterial( {
+                uniforms: uniforms,
+                vertexShader: document.getElementById( 'vertexShader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+            } );
+
+
+            var mesh = new THREE.Mesh( geometry, material );
+            scene.add( mesh );
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+
+            container.appendChild( renderer.domElement );
+
+            onWindowResize();
+            window.addEventListener( 'resize', onWindowResize, false );
+
+            document.onmousemove = function(e){
+              uniforms.u_mouse.value.x = e.pageX
+              uniforms.u_mouse.value.y = e.pageY
+            }
+        }
+
+        function onWindowResize( event ) {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            uniforms.u_resolution.value.x = renderer.domElement.width;
+            uniforms.u_resolution.value.y = renderer.domElement.height;
+        }
+
+        function animate() {
+            requestAnimationFrame( animate );
+            render();
+        }
+
+        function render() {
+            
+            if (uniforms.u_time.value >= 6.0) {
+                uniforms.u_time.value = uniforms.u_time.value
+            } else {
+                uniforms.u_time.value += clock.getDelta();
+            }
+
+            renderer.render( scene, camera );
+        }
+    </script>
+
+</body>
+</html>

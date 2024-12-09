@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/gsap.min.js"
+      integrity="sha512-VEBjfxWUOyzl0bAwh4gdLEaQyDYPvLrZql3pw1ifgb6fhEvZl9iDDehwHZ+dsMzA0Jfww8Xt7COSZuJ/slxc4Q=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollTrigger.min.js"
+      integrity="sha512-v8B8T8l8JiiJRGomPd2k+bPS98RWBLGChFMJbK1hmHiDHYq0EjdQl20LyWeIs+MGRLTWBycJGEGAjKkEtd7w5Q=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollToPlugin.min.js"
+      integrity="sha512-lZACdYsy0W98dOcn+QRNHDxFuhm62lfs8qK5+wPp7X358CN3f+ml49HpnwzTiXFzETs4++fADePDI+L2zwlm7Q=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <title>Document</title>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      .container {
+        width: 600px;
+        height: 600px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.150.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.150.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script id="vertexShader" type="x-shader/x-vertex">
+      varying vec2 vUv;
+      void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+      }
+    </script>
+
+    <!-- Note that number should always be float in shaders -->
+    <script id="fragmentShader" type="x-shader/x-fragment">
+      uniform sampler2D u_texture;
+      varying vec2 vUv;
+      uniform vec2 u_resolution;
+      uniform float u_time;
+
+      float rectshape(vec2 position, vec2 scale) {
+          scale = vec2(0.5) - scale * 0.5;
+          vec2 shaper = vec2(step(scale.x,position.x), step(scale.y,position.y));
+          shaper *= vec2(step(scale.x,1.0 - position.x),step(scale.y, 1.0 - position.y));
+          return shaper.x * shaper.y;
+      }
+
+      void main() {
+          vec2 st = vUv;
+
+          // Adjust the gap size and number of boxes
+          vec4 img = texture2D(u_texture, st);
+          float gapSizeY = 0.5;
+          float gapSizeX = 0.0; // No gap in the x vector
+          int numBoxes = 10;
+          // Calculate the size of each box based on the gap size and number of boxes
+          float boxSizeY = 1.0 / float(numBoxes);
+          float boxSizeX = 1.0 / float(numBoxes);
+          // Loop through and create the boxes
+          vec4 color = vec4(1.0);
+          for (int i = 0; i < numBoxes; ++i) {
+              // Animate scaleX and scaleY with a staggered effect from right to left
+              float columnDelay = 0.1;
+              float maxColumn = float(numBoxes) - 1.0;
+              float timeBasedOffset = u_time - (maxColumn - float(i)) * columnDelay;
+
+              // Animate scaleX
+              float scaleX;
+              if (timeBasedOffset < 8.0) {
+                  scaleX = boxSizeX * (clamp(smoothstep(0.0, 1.0, sin(timeBasedOffset)), 0.0, 1.0));
+              } else {
+                  scaleX = boxSizeX;
+              }
+
+              float scaleY = boxSizeY * (clamp(smoothstep(0.0, 1.0, timeBasedOffset), 0.0, 1.0));
+
+              for (int j = 0; j < numBoxes; ++j) {
+                  float x = gapSizeX * float(i+1) + boxSizeX * float(i);
+
+                  // Animate gapSizeY based on animation progress
+                  float gapSizeYAnim = gapSizeY * (1.0 - clamp(smoothstep(0.0, 1.0, timeBasedOffset), 0.0, 1.0));
+                  float y = gapSizeYAnim * float(j+1) + scaleY * float(j);
+
+                  if (scaleX >= boxSizeX) {
+                      scaleX = boxSizeX;
+                  }
+
+                  if (st.x > x && st.x < x + scaleX && st.y > y && st.y < y + scaleY) {
+                      color = img * vec4(0.7, 0.7, 0.7, 1.0); // Box color from the texture
+                  }
+              }
+          }
+          gl_FragColor = color;
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+
+      var container;
+      var camera, scene, renderer, clock;
+      var uniforms;
+
+      init();
+      animate();
+
+      function init() {
+        container = document.getElementById("container");
+
+        camera = new THREE.PerspectiveCamera(
+          50,
+          window.innerWidth / window.innerHeight,
+          1,
+          10000
+        );
+        camera.position.z = 1;
+
+        scene = new THREE.Scene();
+        clock = new THREE.Clock();
+
+        var geometry = new THREE.PlaneGeometry(2, 1);
+        var textureLoader = new THREE.TextureLoader();
+        var texture = textureLoader.load("./img/gundam.jpg");
+
+        uniforms = {
+          u_time: { type: "f", value: 0.0 },
+          u_animate: { type: "f", value: 1.0 },
+          u_resolution: { type: "v2", value: new THREE.Vector2() },
+          u_mouse: { type: "v2", value: new THREE.Vector2() },
+          u_texture: { type: "t", value: texture },
+        };
+
+        var material = new THREE.ShaderMaterial({
+          uniforms: uniforms,
+          vertexShader: document.getElementById("vertexShader").textContent,
+          fragmentShader: document.getElementById("fragmentShader").textContent,
+        });
+
+        var mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        renderer = new THREE.WebGLRenderer();
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        container.appendChild(renderer.domElement);
+
+        onWindowResize();
+        window.addEventListener("resize", onWindowResize, false);
+
+        document.onmousemove = function (e) {
+          uniforms.u_mouse.value.x = e.pageX;
+          uniforms.u_mouse.value.y = e.pageY;
+        };
+      }
+
+      function onWindowResize(event) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        uniforms.u_resolution.value.x = renderer.domElement.width;
+        uniforms.u_resolution.value.y = renderer.domElement.height;
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        render();
+      }
+
+      function render() {
+        uniforms.u_time.value += clock.getDelta();
+        if (uniforms.u_time.value <= 2.5) {
+        }
+
+        renderer.render(scene, camera);
+      }
+    </script>
+  </body>
+</html>

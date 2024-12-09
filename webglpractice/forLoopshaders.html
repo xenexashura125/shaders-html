@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/gsap.min.js" integrity="sha512-VEBjfxWUOyzl0bAwh4gdLEaQyDYPvLrZql3pw1ifgb6fhEvZl9iDDehwHZ+dsMzA0Jfww8Xt7COSZuJ/slxc4Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollTrigger.min.js" integrity="sha512-v8B8T8l8JiiJRGomPd2k+bPS98RWBLGChFMJbK1hmHiDHYq0EjdQl20LyWeIs+MGRLTWBycJGEGAjKkEtd7w5Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollToPlugin.min.js" integrity="sha512-lZACdYsy0W98dOcn+QRNHDxFuhm62lfs8qK5+wPp7X358CN3f+ml49HpnwzTiXFzETs4++fADePDI+L2zwlm7Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <title>Document</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        /* #container { 
+            width: 600px;
+            height: 600px;
+        } */
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.150.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.150.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script id="vertexShader" type="x-shader/x-vertex">
+        void main() {
+            gl_Position = vec4( position, 1.0 );
+        }
+    </script>
+
+    <!-- Note that number should always be float in shaders -->
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        #ifdef GL_ES 
+        precision mediump float; 
+        #endif 
+        uniform vec2 u_resolution; 
+        uniform float u_time; 
+        uniform sampler2D u_tex0; 
+        void main() { 
+            // Normalized coordinates, ranging from (0.0,0.0) to (1.0,1.0). 
+            vec2 uv = gl_FragCoord.xy / u_resolution.xy; 
+            // Adjust the gap size and number of boxes 
+            vec4 img = texture2D(u_tex0, uv);
+            float gapSize = 0.01; 
+            int numBoxes = 3; 
+            // Calculate the size of each box based on the gap size and number of boxes 
+            float boxSize = (1.0 - (gapSize * float(numBoxes+1))) / float(numBoxes); 
+            // Loop through and create the boxes 
+            vec4 color = vec4(1.0); 
+            for (int i = 0; i < numBoxes; ++i) { 
+                for (int j = 0; j < numBoxes; ++j) { 
+                    float x = gapSize * (float(i+1)) + boxSize * float(i); 
+                    float y = gapSize * (float(j+1)) + boxSize * float(j); 
+                    if (uv.x > x && uv.x < x + boxSize && uv.y > y && uv.y < y + boxSize) { 
+                        // vec2 boxUV = (uv - vec2(x, y)) / boxSize; 
+                        // vec4 img = texture2D(u_tex0, boxUV);
+                        
+                        // grayscaling color
+                        float grayscale_value = dot(img.rgb, vec3(0.299, 0.587, 0.114));
+                        vec4 grayscale_img = vec4(vec3(grayscale_value), 1.0); 
+
+
+                        // color = grayscale_img * vec4(0.8, 0.8, 0.8, 1.0); // Box color from the texture 
+                        color = img * vec4(0.7, 0.7, 0.7, 1.0); // Box color from the texture 
+                    } 
+                } 
+            } 
+            gl_FragColor = color; 
+        }
+    </script>
+    
+    <!-- #ifdef GL_ES 
+    precision mediump float; 
+    #endif 
+    uniform vec2 u_resolution; 
+    uniform float u_time; 
+    uniform sampler2D u_tex0; 
+
+    void main() { 
+        // Normalized coordinates, ranging from (0.0,0.0) to (1.0,1.0). 
+        vec2 uv = gl_FragCoord.xy / u_resolution.xy; 
+
+        vec4 img = texture2D(u_tex0,uv);
+
+        // Adjust the gap size and number of boxes 
+        float gapSize = 0.01; 
+        // Gap size (the higher the value, the larger the gap) 
+        int numBoxes = 3; 
+
+        // Number of boxes in each row and column 
+        // Calculate the size of each box based on the gap size and number of boxes 
+
+        float boxSize = (1.0 - (gapSize * float(numBoxes+1))) / float(numBoxes); 
+        // Loop through and create the boxes 
+        vec3 color = vec3(0.0); 
+        for (int i = 0; i < numBoxes; ++i) { 
+            for (int j = 0; j < numBoxes; ++j) { 
+                float x = gapSize * (float(i+1)) + boxSize * float(i); 
+                float y = gapSize * (float(j+1)) + boxSize * float(j); 
+                if (uv.x > x && uv.x < x + boxSize && uv.y > y && uv.y < y + boxSize) { 
+                    color = vec3(1.0) * img.rgb; // Box color (in this case, white) 
+                } 
+            } 
+        } 
+        gl_FragColor = vec4(color , 1.0); 
+    } -->
+
+    <!-- uniform vec2 u_resolution; 
+    uniform float u_time; 
+    uniform sampler2D u_tex0; 
+    uniform float u_animate; 
+
+    float rectshape(vec2 position, vec2 scale, vec2 grid_position) { 
+        vec2 gap = vec2(0.01, 0.01); 
+        position = (position - gap * 0.5) / (1.0 - gap); 
+        vec2 t = mod(position * grid_position, 1.0); 
+        vec2 shaper = vec2(step(scale.x, t.x), step(scale.y, t.y)); 
+        shaper *= vec2(step(scale.x, 1.0 - t.x), step(scale.y, 1.0 - t.y)); 
+        return shaper.x * shaper.y; 
+    } 
+    void main() { 
+        vec2 st = gl_FragCoord.xy / u_resolution.xy; 
+
+        vec4 img = texture2D(u_tex0,st);
+        vec3 color = vec3(0.0); 
+        vec2 gridSize = vec2(2.0, 5.0); 
+        float rectSize = 0.025; 
+        color = vec3(rectshape(st, vec2(rectSize, rectSize), gridSize)); 
+        gl_FragColor = vec4(color * img.xyz, 1.0); 
+    } -->
+
+
+    <script type="module">
+
+        import * as THREE from 'three';
+
+        var container;
+        var camera, scene, renderer, clock;
+        var uniforms;
+
+        init();
+        animate();
+
+        function init() {
+            container = document.getElementById( 'container' );
+
+            camera = new THREE.Camera();
+            camera.position.z = 1;
+
+            scene = new THREE.Scene();
+            clock = new THREE.Clock();
+
+            var geometry = new THREE.PlaneBufferGeometry( 2, 2 );
+            var textureLoader = new THREE.TextureLoader();
+            var texture = textureLoader.load( './img/gundam.jpg' );
+
+            uniforms = {
+                u_time: { type: "f", value: 1.0 },
+                u_animate: { type: "f", value: 1.0 },
+                u_resolution: { type: "v2", value: new THREE.Vector2() },
+                u_mouse: { type: "v2", value: new THREE.Vector2() },
+                u_tex0: { type: "t", value: texture }
+            };
+
+            var material = new THREE.ShaderMaterial( {
+                uniforms: uniforms,
+                vertexShader: document.getElementById( 'vertexShader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+            } );
+
+
+            var mesh = new THREE.Mesh( geometry, material );
+            scene.add( mesh );
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+
+            container.appendChild( renderer.domElement );
+
+            onWindowResize();
+            window.addEventListener( 'resize', onWindowResize, false );
+
+            document.onmousemove = function(e){
+              uniforms.u_mouse.value.x = e.pageX
+              uniforms.u_mouse.value.y = e.pageY
+            }
+        }
+
+        function onWindowResize( event ) {
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            uniforms.u_resolution.value.x = renderer.domElement.width;
+            uniforms.u_resolution.value.y = renderer.domElement.height;
+        }
+
+        function animate() {
+            requestAnimationFrame( animate );
+            render();
+        }
+
+        function render() {
+            
+            if (uniforms.u_time.value >= 2.5) {
+                uniforms.u_time.value = uniforms.u_time.value
+            } else {
+                uniforms.u_time.value += clock.getDelta();
+            }
+
+            renderer.render( scene, camera );
+        }
+    </script>
+
+</body>
+</html>

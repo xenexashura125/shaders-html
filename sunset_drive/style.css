@@ -1,0 +1,38 @@
+@import url('https://fonts.googleapis.com/css?family=Pacifico&display=swap');
+body{
+  overflow:hidden;
+  margin: 0;
+}
+#cnv{
+  position: absolute;
+  font-family: "Pacifico", cursive;
+  z-index: -10;
+}
+#drive{
+  position: absolute;
+  left: calc(50% - 30vh);
+  bottom: 4vh;
+  width: 60vh;
+  font-family: "Pacifico", cursive;
+  font-size: 20vh;
+  line-height: 1em;
+  text-align: center;
+  background: -webkit-linear-gradient(#ffff00, aquamarine);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+#drive::before{ /* outline */
+  margin-left: -1vh;
+  padding: 0;
+  position: absolute;
+  content: "Sunset Drive";
+  -webkit-text-stroke: 2vh gray;
+  z-index: -1;
+}
+
+.unselectable {
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}

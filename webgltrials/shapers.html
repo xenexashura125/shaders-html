@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/gsap.min.js" integrity="sha512-VEBjfxWUOyzl0bAwh4gdLEaQyDYPvLrZql3pw1ifgb6fhEvZl9iDDehwHZ+dsMzA0Jfww8Xt7COSZuJ/slxc4Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollTrigger.min.js" integrity="sha512-v8B8T8l8JiiJRGomPd2k+bPS98RWBLGChFMJbK1hmHiDHYq0EjdQl20LyWeIs+MGRLTWBycJGEGAjKkEtd7w5Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.10.4/ScrollToPlugin.min.js" integrity="sha512-lZACdYsy0W98dOcn+QRNHDxFuhm62lfs8qK5+wPp7X358CN3f+ml49HpnwzTiXFzETs4++fADePDI+L2zwlm7Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <title>Document</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        #container { 
+            width: 600px;
+            height: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.150.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.150.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script id="vertexShader" type="x-shader/x-vertex">
+        void main() {
+            gl_Position = vec4( position, 1.0 );
+        }
+    </script>
+
+    <!-- Note that number should always be float in shaders -->
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        #ifdef GL_ES
+        precision mediump float;
+        #endif
+        
+        #define PI 3.14159265358979323846
+        
+        uniform vec2 u_resolution;
+        uniform float u_time;
+        
+        vec2 rotate2D (vec2 _st, float _angle) {
+            _st -= 0.5;
+            _st =  mat2(cos(_angle),-sin(_angle),
+                        sin(_angle),cos(_angle)) * _st;
+            _st += 0.5;
+            return _st;
+        }
+        
+        vec2 tile (vec2 _st, float _zoom) {
+            _st *= _zoom;
+            return fract(_st);
+        }
+        
+        vec2 rotateTilePattern(vec2 _st){
+        
+            //  Scale the coordinate system by 2x2
+            _st *= 2.0;
+        
+            //  Give each cell an index number
+            //  according to its position
+            float index = 0.0;
+            index += step(1., mod(_st.x,2.0));
+            index += step(1., mod(_st.y,2.0))*2.0;
+        
+            //      |
+            //  2   |   3
+            //      |
+            //--------------
+            //      |
+            //  0   |   1
+            //      |
+        
+            // Make each cell between 0.0 - 1.0
+            _st = fract(_st);
+        
+            // Rotate each cell according to the index
+            if(index == 1.0){
+                //  Rotate cell 1 by 90 degrees
+                _st = rotate2D(_st,PI*0.5);
+            } else if(index == 2.0){
+                //  Rotate cell 2 by -90 degrees
+                _st = rotate2D(_st,PI*-0.5);
+            } else if(index == 3.0){
+                //  Rotate cell 3 by 180 degrees
+                _st = rotate2D(_st,PI);
+            }
+        
+            return _st;
+        }
+        
+        void main () {
+            vec2 st = gl_FragCoord.xy/u_resolution.xy;
+        
+            st = tile(st,3.0);
+            st = rotateTilePattern(st);
+        
+            // Make more interesting combinations
+            // st = tile(st,2.0);
+            // st = rotate2D(st,-PI*u_time*0.25);
+            // st = rotateTilePattern(st*2.);
+            // st = rotate2D(st,PI*u_time*0.25);
+        
+            // step(st.x,st.y) just makes a b&w triangles
+            // but you can use whatever design you want.
+            gl_FragColor = vec4(vec3(step(st.x,st.y)),1.0);
+        }
+    </script>
+
+
+    <script type="module">
+
+        import * as THREE from 'three';
+
+        var container;
+        var camera, scene, renderer, clock;
+        var uniforms;
+
+        init();
+        animate();
+
+        function init() {
+            container = document.getElementById( 'container' );
+
+            console.log(container.cli)
+            camera = new THREE.Camera();
+            camera.position.z = 1;
+
+            scene = new THREE.Scene();
+            clock = new THREE.Clock();
+
+            var geometry = new THREE.PlaneBufferGeometry( 2, 2 );
+
+            uniforms = {
+                u_time: { type: "f", value: 1.0 },
+                u_resolution: { type: "v2", value: new THREE.Vector2() },
+                u_mouse: { type: "v2", value: new THREE.Vector2() }
+            };
+
+            var material = new THREE.ShaderMaterial( {
+                uniforms: uniforms,
+                vertexShader: document.getElementById( 'vertexShader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+            } );
+
+            var mesh = new THREE.Mesh( geometry, material );
+            scene.add( mesh );
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+
+            container.appendChild( renderer.domElement );
+
+            onWindowResize();
+            window.addEventListener( 'resize', onWindowResize, false );
+
+            document.onmousemove = function(e){
+              uniforms.u_mouse.value.x = e.pageX
+              uniforms.u_mouse.value.y = e.pageY
+            }
+        }
+
+        function onWindowResize( event ) {
+            renderer.setSize( container.clientWidth, container.clientWidth );
+            uniforms.u_resolution.value.x = renderer.domElement.width;
+            uniforms.u_resolution.value.y = renderer.domElement.height;
+        }
+
+        function animate() {
+            requestAnimationFrame( animate );
+            render();
+        }
+
+        function render() {
+            uniforms.u_time.value += clock.getDelta();
+            renderer.render( scene, camera );
+        }
+    </script>
+
+</body>
+</html>
